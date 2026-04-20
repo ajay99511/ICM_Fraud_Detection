@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 ENCODERS_PATH = "models/label_encoders.joblib"
 MEDIANS_PATH = "models/train_medians.joblib"
+DROP_COLS_PATH = "models/drop_cols.joblib"
 
 
 def transform_data(
@@ -17,6 +18,7 @@ def transform_data(
     fit: bool = True,
     encoders_path: str = ENCODERS_PATH,
     medians_path: str = MEDIANS_PATH,
+    drop_cols_path: str = DROP_COLS_PATH,
 ) -> pd.DataFrame:
     """
     Transform raw merged DataFrame for model training or inference.
@@ -27,18 +29,28 @@ def transform_data(
                        If False, load saved encoders/medians and apply (inference mode).
         encoders_path: Path to save/load fitted LabelEncoders.
         medians_path:  Path to save/load training medians.
+        drop_cols_path: Path to save/load columns dropped during training.
 
     Returns:
         Transformed DataFrame.
     """
     df = df.copy()
 
-    # ── 1. Drop columns with >90% missing values (training only) ──────────────
+    # ── 1. Drop columns with >90% missing values ──────────────────────────────
     if fit:
         null_pct = df.isnull().sum() / len(df)
         drop_cols = null_pct[null_pct > 0.9].index.tolist()
         logger.info(f"Dropping {len(drop_cols)} columns with >90% missing values.")
         df = df.drop(columns=drop_cols)
+        os.makedirs(os.path.dirname(drop_cols_path), exist_ok=True)
+        joblib.dump(drop_cols, drop_cols_path)
+        logger.info(f"Saved drop_cols list ({len(drop_cols)} cols) to {drop_cols_path}")
+    else:
+        if not os.path.exists(drop_cols_path):
+            raise FileNotFoundError(f"drop_cols not found at {drop_cols_path}. Run training first.")
+        drop_cols = joblib.load(drop_cols_path)
+        cols_to_drop = [c for c in drop_cols if c in df.columns]
+        df = df.drop(columns=cols_to_drop)
 
     # ── 2. Time engineering ───────────────────────────────────────────────────
     if "TransactionDT" in df.columns:

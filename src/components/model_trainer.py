@@ -54,10 +54,14 @@ def train_model(
 
     model = xgb.XGBClassifier(
         n_estimators=500,
-        max_depth=6,
+        max_depth=4,           # reduced from 6 — shallower trees generalize better
         learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
+        subsample=0.7,         # reduced from 0.8 — more regularization
+        colsample_bytree=0.7,  # reduced from 0.8
+        min_child_weight=5,    # added — prevents splits on very few fraud samples
+        gamma=1.0,             # added — minimum loss reduction to make a split
+        reg_alpha=0.1,         # added — L1 regularization
+        reg_lambda=1.5,        # added — L2 regularization
         n_jobs=-1,
         random_state=random_state,
         scale_pos_weight=scale_pos_weight,

@@ -19,12 +19,14 @@ class PredictionPipeline:
         model_path: str = "models/fraud_model.joblib",
         encoders_path: str = "models/label_encoders.joblib",
         medians_path: str = "models/train_medians.joblib",
+        drop_cols_path: str = "models/drop_cols.joblib",
         schema_path: str = "data/processed/train_transformed_sample.csv",
     ):
         for path, label in [
             (model_path, "model"),
             (encoders_path, "label encoders"),
             (medians_path, "training medians"),
+            (drop_cols_path, "drop cols list"),
             (schema_path, "schema reference"),
         ]:
             if not os.path.exists(path):
@@ -36,19 +38,26 @@ class PredictionPipeline:
         self.model = joblib.load(model_path)
         self.label_encoders: dict = joblib.load(encoders_path)
         self.medians: dict = joblib.load(medians_path)
+        self.drop_cols: list = joblib.load(drop_cols_path)
 
         # Derive expected feature columns from the saved schema (excludes target/ID)
         schema_df = pd.read_csv(schema_path, nrows=1)
-        drop_cols = [c for c in ["isFraud", "TransactionID"] if c in schema_df.columns]
-        self.feature_cols: list[str] = schema_df.drop(columns=drop_cols).columns.tolist()
+        drop_meta = [c for c in ["isFraud", "TransactionID"] if c in schema_df.columns]
+        self.feature_cols: list[str] = schema_df.drop(columns=drop_meta).columns.tolist()
 
         logger.info(
             f"Pipeline loaded: {len(self.feature_cols)} features, "
-            f"{len(self.label_encoders)} encoders, {len(self.medians)} medians."
+            f"{len(self.label_encoders)} encoders, {len(self.medians)} medians, "
+            f"{len(self.drop_cols)} dropped cols."
         )
 
     def preprocess(self, input_df: pd.DataFrame) -> pd.DataFrame:
         df = input_df.copy()
+
+        # ── Drop columns that were excluded during training ───────────────────
+        cols_to_drop = [c for c in self.drop_cols if c in df.columns]
+        if cols_to_drop:
+            df = df.drop(columns=cols_to_drop)
 
         # ── Time engineering ──────────────────────────────────────────────────
         if "TransactionDT" in df.columns:
@@ -77,10 +86,16 @@ class PredictionPipeline:
                 df[col] = df[col].fillna(median_val)
 
         # ── Align columns to training schema ─────────────────────────────────
-        for col in self.feature_cols:
-            if col not in df.columns:
-                # Use training median if available, else 0
-                df[col] = self.medians.get(col, 0)
+        missing_cols = {
+            col: self.medians.get(col, 0)
+            for col in self.feature_cols
+            if col not in df.columns
+        }
+        if missing_cols:
+            df = pd.concat(
+                [df, pd.DataFrame(missing_cols, index=df.index)],
+                axis=1,
+            )
 
         # Fill any remaining NAs
         df = df.fillna(0)

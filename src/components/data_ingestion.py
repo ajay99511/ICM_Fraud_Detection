@@ -40,9 +40,11 @@ def ingest_data(
     output_path: str = "data/processed/train_sample.csv",
     sample_size: int = 10_000,
     optimize_memory: bool = True,
+    random_state: int = 42,
 ) -> pd.DataFrame:
     """
-    Load, merge, optionally downsample and memory-optimize the raw data.
+    Load, merge, stratified-sample and memory-optimize the raw data.
+    Uses stratified sampling to preserve the fraud class ratio in the sample.
     Returns the full merged DataFrame.
     """
     for path in [trans_path, id_path]:
@@ -68,9 +70,21 @@ def ingest_data(
     logger.info(f"Top 10 missing value rates:\n{missing_top.to_string()}")
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    sample = train.head(sample_size)
+
+    # Stratified sample — preserves fraud class ratio instead of taking head()
+    actual_size = min(sample_size, len(train))
+    frac = actual_size / len(train)
+    sample = (
+        train.groupby("isFraud", group_keys=False)
+        .apply(lambda g: g.sample(frac=frac, random_state=random_state))
+        .sample(frac=1, random_state=random_state)  # shuffle after groupby
+        .reset_index(drop=True)
+    )
     sample.to_csv(output_path, index=False)
-    logger.info(f"Saved {sample_size}-row sample to {output_path}")
+    logger.info(
+        f"Saved stratified {len(sample)}-row sample to {output_path} "
+        f"(fraud rate: {sample['isFraud'].mean():.2%})"
+    )
 
     return train
 

@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 MODEL_PATH = os.getenv("MODEL_PATH", "models/fraud_model.joblib")
 ENCODERS_PATH = os.getenv("ENCODERS_PATH", "models/label_encoders.joblib")
 MEDIANS_PATH = os.getenv("MEDIANS_PATH", "models/train_medians.joblib")
+DROP_COLS_PATH = os.getenv("DROP_COLS_PATH", "models/drop_cols.joblib")
 SCHEMA_PATH = os.getenv("SCHEMA_PATH", "data/processed/train_transformed_sample.csv")
 FRAUD_THRESHOLD = float(os.getenv("FRAUD_THRESHOLD", "0.5"))
 
@@ -30,6 +31,7 @@ async def lifespan(app: FastAPI):
             model_path=MODEL_PATH,
             encoders_path=ENCODERS_PATH,
             medians_path=MEDIANS_PATH,
+            drop_cols_path=DROP_COLS_PATH,
             schema_path=SCHEMA_PATH,
         )
         logger.info("Prediction pipeline loaded successfully.")
