@@ -36,9 +36,13 @@ def transform_data(
     """
     df = df.copy()
 
+    # Columns that must pass through untouched — never transform target or ID
+    PASSTHROUGH = [c for c in ["isFraud", "TransactionID"] if c in df.columns]
+
     # ── 1. Drop columns with >90% missing values ──────────────────────────────
     if fit:
-        null_pct = df.isnull().sum() / len(df)
+        # Exclude passthrough cols from the null-drop check
+        null_pct = df.drop(columns=PASSTHROUGH).isnull().sum() / len(df)
         drop_cols = null_pct[null_pct > 0.9].index.tolist()
         logger.info(f"Dropping {len(drop_cols)} columns with >90% missing values.")
         df = df.drop(columns=drop_cols)
@@ -58,7 +62,11 @@ def transform_data(
         df["Transaction_day"] = (df["TransactionDT"] // (3600 * 24)) % 7
 
     # ── 3. Categorical encoding ───────────────────────────────────────────────
-    cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+    # Exclude passthrough cols — they're numeric/int, not categories to encode
+    cat_cols = [
+        c for c in df.select_dtypes(include=["object", "category", "string"]).columns
+        if c not in PASSTHROUGH
+    ]
 
     if fit:
         label_encoders: dict[str, LabelEncoder] = {}
@@ -86,7 +94,11 @@ def transform_data(
                 df[col] = 0  # column not seen during training
 
     # ── 4. Numeric missing values ─────────────────────────────────────────────
-    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    # Exclude passthrough cols from median imputation
+    num_cols = [
+        c for c in df.select_dtypes(include=["number"]).columns
+        if c not in PASSTHROUGH
+    ]
 
     if fit:
         medians = {col: df[col].median() for col in num_cols if df[col].isnull().any()}

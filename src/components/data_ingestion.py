@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import logging
+from sklearn.model_selection import train_test_split
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -71,15 +72,19 @@ def ingest_data(
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Stratified sample — preserves fraud class ratio instead of taking head()
+    # Stratified sample via train_test_split — robust across all pandas versions
     actual_size = min(sample_size, len(train))
-    frac = actual_size / len(train)
-    sample = (
-        train.groupby("isFraud", group_keys=False)
-        .apply(lambda g: g.sample(frac=frac, random_state=random_state))
-        .sample(frac=1, random_state=random_state)  # shuffle after groupby
-        .reset_index(drop=True)
-    )
+    if actual_size < len(train):
+        sample, _ = train_test_split(
+            train,
+            train_size=actual_size,
+            stratify=train["isFraud"],
+            random_state=random_state,
+        )
+    else:
+        sample = train
+
+    sample = sample.reset_index(drop=True)
     sample.to_csv(output_path, index=False)
     logger.info(
         f"Saved stratified {len(sample)}-row sample to {output_path} "
