@@ -421,3 +421,14 @@ The `is_fraud` boolean is derived from `fraud_probability > FRAUD_THRESHOLD`. Th
 This project uses the [IEEE-CIS Fraud Detection](https://www.kaggle.com/c/ieee-fraud-detection) dataset, a collaboration between IEEE, the Computational Intelligence Society, and **Vesta Corporation** — a real fraud prevention company. The features reflect actual signals used in production fraud systems.
 
 Raw data files are not included in this repository and must be downloaded separately from Kaggle.
+
+---
+
+## What Makes This "Production-Accepted" Specifically
+
+Artifact persistence — encoders, medians, and model saved separately so they can be versioned and deployed independently
+Schema alignment — the pipeline reads the training schema at startup and enforces it at inference, preventing silent feature mismatch bugs
+Lifespan management — model loads once at startup, not on every request
+Batch endpoint — real systems don't always score one transaction at a time; batch scoring is used for end-of-day reconciliation, risk reporting, and backfill jobs
+Configurable threshold — business logic separated from model logic
+Graceful handling of unseen categories — a new card network or email domain won't crash the service
