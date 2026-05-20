@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICM Fraud Detection — Architecture Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f8f9fa; margin: 0; padding: 20px; }
+        .container { display: flex; width: 100%; max-width: 1200px; gap: 20px; }
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .left-panel { flex: 1; }
+        .center-panel { flex: 2; display: flex; flex-direction: column; align-items: center; }
+        .right-panel { flex: 1; }
+        h1 { color: #1565c0; }
+        h2 { color: #2e7d32; border-bottom: 2px solid #e8f5e9; padding-bottom: 5px; }
+        .hyperparameter { margin-bottom: 10px; font-size: 0.9em; }
+        .hyperparameter b { color: #1565c0; }
+        .code-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .code-table th, .code-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .code-table th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>ICM Fraud Detection — Architecture</h1>
+    <div class="container">
+        <div class="panel left-panel">
+            <h2>Model Config</h2>
+            <div class="hyperparameter"><b>Algorithm:</b> XGBoost (XGBClassifier)</div>
+            <div class="hyperparameter"><b>n_estimators:</b> 500</div>
+            <div class="hyperparameter"><b>max_depth:</b> 4</div>
+            <div class="hyperparameter"><b>learning_rate:</b> 0.05</div>
+            <div class="hyperparameter"><b>subsample:</b> 0.7</div>
+            <div class="hyperparameter"><b>colsample_bytree:</b> 0.7</div>
+            <div class="hyperparameter"><b>min_child_weight:</b> 5</div>
+            <div class="hyperparameter"><b>gamma:</b> 1.0</div>
+            <div class="hyperparameter"><b>reg_alpha:</b> 0.1</div>
+            <div class="hyperparameter"><b>reg_lambda:</b> 1.5</div>
+            <div class="hyperparameter"><b>scale_pos_weight:</b> Dynamic (neg/pos)</div>
+            <div class="hyperparameter"><b>eval_metric:</b> auc</div>
+        </div>
+        <div class="panel center-panel">
+            <div class="mermaid">
+                flowchart TD
+                A["Raw Data (CSV)"] --> B
+                subgraph DATA["data_ingestion.py"]
+                    B["Merge Trans/ID"] --> C["Reduce Mem Usage"]
+                    C --> D["Stratified Sampling"]
+                end
+                D --> E
+                subgraph TRANS["data_transformation.py"]
+                    E["Drop >90% Nulls"] --> F["Time Engineering"]
+                    F --> G["Label Encoding"]
+                    G --> H["Median Imputation"]
+                end
+                H --> I
+                subgraph MODEL["model_trainer.py"]
+                    I["XGBClassifier"]
+                    I --> J["Predictions"]
+                end
+                J --> K
+                subgraph PIPELINE["prediction_pipeline.py"]
+                    K["Preprocessing (Align)"] --> L["Inference Predict"]
+                end
+                L --> M["API Response"]
+            </div>
+        </div>
+        <div class="panel right-panel">
+            <h2>Data Stats</h2>
+            <div class="hyperparameter"><b>Input:</b> IEEE-CIS Fraud Dataset</div>
+            <div class="hyperparameter"><b>Merging:</b> Left Join on TransactionID</div>
+            <div class="hyperparameter"><b>Sampling:</b> 10,000 rows (Stratified)</div>
+            <div class="hyperparameter"><b>Features:</b> Dynamic (aligned to training)</div>
+            <div class="hyperparameter"><b>Null Threshold:</b> 90%</div>
+            <div class="hyperparameter"><b>Imputation:</b> Median (from training)</div>
+        </div>
+    </div>
+    <div class="panel" style="width: 100%; max-width: 1200px; margin-top: 20px;">
+        <h2>Code → Component Mapping</h2>
+        <table class="code-table">
+            <tr>
+                <th>Component</th>
+                <th>Source File</th>
+                <th>Details</th>
+            </tr>
+            <tr>
+                <td>Data Ingestion</td>
+                <td>src/components/data_ingestion.py</td>
+                <td>Loads and merges CSVs; reduces memory.</td>
+            </tr>
+            <tr>
+                <td>Transformation</td>
+                <td>src/components/data_transformation.py</td>
+                <td>Handles encoding and imputation logic.</td>
+            </tr>
+            <tr>
+                <td>Model Training</td>
+                <td>src/components/model_trainer.py</td>
+                <td>Fits XGBoost with regularization.</td>
+            </tr>
+            <tr>
+                <td>Inference Pipeline</td>
+                <td>src/pipeline/prediction_pipeline.py</td>
+                <td>Ensures feature parity for real-time scoring.</td>
+            </tr>
+            <tr>
+                <td>REST API</td>
+                <td>app.py</td>
+                <td>FastAPI endpoints for single/batch scoring.</td>
+            </tr>
+        </table>
+    </div>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+</body>
+</html>

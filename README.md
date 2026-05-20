@@ -68,6 +68,58 @@ The trained model outputs a **fraud probability [0, 1]**. Downstream decision en
 
 ---
 
+## Architecture
+
+### System Diagram
+
+![ICM Fraud Detection Architecture](docs/icm_fraud_detection_architecture.png)
+
+> **Interactive HTML version:** [`docs/architecture_diagram.html`](docs/architecture_diagram.html)
+
+#### Data Flow — Forward Pass
+
+```mermaid
+flowchart TD
+    A["Raw Data (CSV)"] --> B
+    subgraph DATA["data_ingestion.py — Data Pipeline"]
+        B["Merge Trans/ID"] --> C["Reduce Mem Usage"]
+        C --> D["Stratified Sampling"]
+    end
+    D --> E
+    subgraph TRANS["data_transformation.py — Transformation"]
+        E["Drop >90% Nulls"] --> F["Time Engineering"]
+        F --> G["Label Encoding"]
+        G --> H["Median Imputation"]
+    end
+    H --> I
+    subgraph MODEL["model_trainer.py — XGBoost Model"]
+        I["XGBClassifier"]
+        I --> J["Predictions (Fraud Prob)"]
+    end
+    J --> K
+    subgraph PIPELINE["prediction_pipeline.py — Inference"]
+        K["Preprocessing (Align)"] --> L["Model Predict"]
+    end
+    L --> M["Final Output"]
+    
+    style DATA fill:#e8f5e9,stroke:#2e7d32
+    style TRANS fill:#f3e5f5,stroke:#7b1fa2
+    style MODEL fill:#e3f2fd,stroke:#1565c0
+    style PIPELINE fill:#fff3e0,stroke:#e65100
+```
+
+#### Code → Component Mapping
+
+| Diagram Component | Source File | Class / Function |
+|---|---|---|
+| Data Ingestion | `src/components/data_ingestion.py` | `ingest_data`, `reduce_mem_usage` |
+| Data Transformation | `src/components/data_transformation.py` | `transform_data` |
+| Model Training | `src/components/model_trainer.py` | `train_model` (XGBClassifier) |
+| Prediction Pipeline | `src/pipeline/prediction_pipeline.py` | `PredictionPipeline` |
+| API Interface | `app.py` | `FastAPI` (predict/batch) |
+
+---
+
 ## Project Structure
 
 ```
